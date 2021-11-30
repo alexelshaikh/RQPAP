@@ -9,10 +9,17 @@ pub struct PseudoPermutation {
 }
 
 impl PseudoPermutation {
+    /// Creates a PseudoPermutation instance. This is an approximation for a real permutation, and is used to accelerate LSH.
+    /// # Arguments
+    /// * `m` - The largest index for this instance to permute. For example, if you want to permute a 100 elements vector, m would be 100.
     pub fn new(m: usize) -> Self {
         Self::new_from_p(m, m)
     }
 
+    /// Creates a PseudoPermutation instance. This is an approximation for a real permutation, and is used to accelerate LSH.
+    /// # Arguments
+    /// * `m` - The largest index for this instance to permute. For example, if you want to permute a 100 elements vector, m would be 100.
+    /// * `p_1` - `p_1` must be greater than or equal to `m`. This LSH will use the next prime number greater than `p_1`.
     pub fn new_from_p(m: usize, p_1: usize) -> Self {
         if p_1 < m {
             panic!("p must be >= m");
@@ -30,6 +37,8 @@ impl PseudoPermutation {
     pub fn get_p(&self) -> usize {
         self.p
     }
+
+    /// Permutes index `x` to the permuted index.
     pub fn apply(&self, x: usize) -> usize {
         ((self.a * x + self.b) % self.p) % self.m
     }

@@ -16,6 +16,11 @@ pub struct LSH {
 }
 
 impl LSH {
+    /// Creates an LSH instance that is completely thread-safe.
+    /// # Arguments
+    /// * `k` - The length of the k-mers.
+    /// * `r` - The number of hash functions.
+    /// * `b` - The number of bands.
     pub fn new(k: usize, r: usize, b: usize) -> Self {
         if r % b != 0_usize {
             panic!("r must be a multiple of b");
@@ -41,6 +46,7 @@ impl LSH {
         }
     }
 
+    /// Inserts `seq` into the LSH.
     pub fn insert(&mut self, seq: &Arc<BaseSequence>) {
         let sigs = self.signatures(seq);
         for band in 0_usize..self.bands.len() {
@@ -59,6 +65,7 @@ impl LSH {
         }
     }
 
+    /// Queries the LSh with `seq` and returns similar sequence it matches.
     pub fn similar_seqs(&self, seq: &Arc<BaseSequence>) -> HashSet<Arc<BaseSequence>> {
         let sigs = self.signatures(seq);
         let mut result = HashSet::new();

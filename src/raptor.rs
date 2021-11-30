@@ -9,6 +9,7 @@ use std::ops::{Range, Add, Sub};
 use std::sync::Arc;
 use std::time::{SystemTime, Duration};
 
+/// The Enum that represents an encoding status of a final DNA strand resembling an Info-DNA.
 enum PacketsResult {
     Found(Arc<BaseSequence>, u8),
     RulesNotSatisfied(Arc<BaseSequence>, u8),
@@ -16,6 +17,7 @@ enum PacketsResult {
     OverheadTooBig(usize)
 }
 
+/// RQ's configuration holder.
 pub struct RaptorQ {
     source_blocks: usize,
     sub_blocks: usize,
@@ -24,14 +26,23 @@ pub struct RaptorQ {
 }
 
 impl RaptorQ {
+    /// Creates a new RQ with the given configuration.
     pub fn new(source_blocks: usize, sub_blocks: usize, alignment: usize, symbol_size: usize) -> Self {
         Self { source_blocks, sub_blocks, alignment, symbol_size }
     }
-
+    /// Creates a new RQ with the default configuration.
     pub fn default() -> Self {
         Self { source_blocks: 1, sub_blocks: 1, alignment: 3, symbol_size: 6 }
     }
-
+    /// The function that encodes a data object (in bytes) into an Info-DNA while fulfilling the given DNA constraints. Returns a DNA sequence (Info-DNA) for the given `data`.
+    /// # Arguments
+    /// * `data` - The data object that is to be encoded to an Info-DNA.
+    /// * `packets_per_block` - The number of packets that will be generated initially.
+    /// * `max_block_encode_loops` - The number of loops in which we attempt to successfully encode `data`.
+    /// * `overhead` - The overhead ε for RQ.
+    /// * `gc_and_hp_check` - The function that checks the GC content and homopolymer length requirements for the DNA sequence.
+    /// * `strand_rule_no_dg` - The function that checks the constraints on final Info-DNA (excluding the dg error).
+    /// * `dg_check` - The function that checks the error by the dg server.
     pub fn encode_to_dna_with_rules(&self,
                                     data: &[u8],
                                     mut packets_per_block: usize,
@@ -80,14 +91,17 @@ impl RaptorQ {
                             packets_count_last = packets_count;
                         }
                     }
+                    // the packets could be decodable but do not contain the specified overhead -> need more packets
                     PacketsResult::OverheadTooBig(missing) => {
                         packets_count += missing * packets_per_block + 1_usize;
                         break;
                     }
+                    // the packets were not decodable -> need more packets
                     PacketsResult::NotDecodable => {
                         packets_count += packets_per_block;
                         break;
                     }
+                    // the packets are decodable but do not meet the requirements given by the constraints
                     PacketsResult::RulesNotSatisfied(strand, packets_count) => {
                         last_strand = strand;
                         packets_count_last = packets_count;
@@ -104,6 +118,7 @@ impl RaptorQ {
     }
 
 
+    /// Collects the given `range` into a vector, permutes it by `rng`, and returns the vector.
     #[inline]
     fn random_order(range: Range<usize>, rng: &mut ThreadRng) -> Vec<usize> {
         let count = range.len();
@@ -119,6 +134,7 @@ impl RaptorQ {
         v
     }
 
+    /// The function that combines `packets` into a single DNA strand. It will opt to combine as many as needed to be decodable and meet the `overhead` specified. The strand must fulfill `strand_id_ok_func`.
     #[inline]
     fn combine_packets_to_strand(packets: &Vec<(Arc<BaseSequence>, Vec<u8>)>, mut decoder: Decoder, overhead: usize, index_order: &[usize], strand_is_ok_func: impl Fn(&Arc<BaseSequence>) -> bool) -> PacketsResult {
         let mut current_overhead = -1_isize;
@@ -149,6 +165,7 @@ impl RaptorQ {
         PacketsResult::NotDecodable
     }
 
+    /// Adds a header (containing the RQ configuration) to `seq` that allows a DNA strand to be decoded.
     #[inline]
     fn finalize_encoding(seq: &Arc<BaseSequence>, data_len: u8, packets_count: u8) -> Arc<BaseSequence> {
         let file_len = Self::map_half_byte_to_bases(data_len);
@@ -158,6 +175,7 @@ impl RaptorQ {
         Arc::new(final_seq)
     }
 
+    /// Generates `packets_per_block` packets that satisfy `rules_func`.
     #[inline]
     pub fn generate_packets(block_encoder: &SourceBlockEncoder, packets_per_block: usize, from_repair_esi: usize, rules_func: impl Fn(&Arc<BaseSequence>) -> bool) -> (Vec<(Arc<BaseSequence>, Vec<u8>)>) {
         let mut packets = Vec::with_capacity(packets_per_block);
@@ -171,11 +189,13 @@ impl RaptorQ {
         packets
     }
 
+    /// Maps a byte slice to a BaseSequence.
     #[inline]
     fn map_bytes_to_base_sequence(slice: &[u8]) -> BaseSequence {
         BaseSequence::new(slice.iter().flat_map(|b| Self::map_byte_to_bases(*b)).collect())
     }
 
+    /// Maps a single byte to 4 DNA bases.
     #[inline]
     fn map_byte_to_bases(b: u8) -> Vec<Base> {
         let mut result = Vec::with_capacity(4);
@@ -188,6 +208,7 @@ impl RaptorQ {
         result
     }
 
+    /// Maps a half byte to 2 DNA bases.
     #[inline]
     fn map_half_byte_to_bases(b: u8) -> Vec<Base> {
         let mut result = Vec::with_capacity(2);
@@ -198,6 +219,7 @@ impl RaptorQ {
     }
 
 
+    /// Converts a byte to a single DNA base.
     #[inline]
     fn map_byte_to_base(bits: u8) -> Base {
         unsafe {
@@ -205,6 +227,7 @@ impl RaptorQ {
         }
     }
 
+    /// Computes and returns the next `count` repair packets starting from the encoding symbol id (ESI) `from_repair_esi`.
     #[inline]
     fn next_n_packets(source_block_enc: &SourceBlockEncoder, from_repair_esi :usize, count: usize) -> Vec<Vec<u8>> {
         source_block_enc.repair_packets(from_repair_esi as u32, count as u32).into_iter().map(|p| p.serialize()).collect()

@@ -11,8 +11,13 @@ use parking_lot::lock_api::MutexGuard;
 pub struct DGClient {
     channels: Vec<ChannelHandler>,
 }
-
+/// The client used to communicate with the dg server.
 impl DGClient {
+    /// Creates a new DGClient instance.
+    /// # Arguments
+    /// * The arguments `a`, `b`, `c`, and `d` represent the IP address of the dg server. For example, if the IP is 127.0.0.1, then `a` = 127, `b` = 0, `c` = 0, and `d` = 1.
+    /// * `start_port` - The starting port of the dg server.
+    /// * `count` - The number of ports (including `start_port`).
     pub fn new(a: u8, b: u8, c: u8, d: u8, start_port: u16, count: u16) -> Option<DGClient> {
         let channels = (start_port..start_port + count)
             .map(|port| ChannelHandler::new(a, b, c, d, port))
@@ -29,6 +34,7 @@ impl DGClient {
         }
     }
 
+    /// Returns the dg energy for a given `seq`. Will loop over all ports (channels) to send the query. Will start at port `from_id`.
     #[inline(always)]
     pub fn dg_arc_from_id(&self, mut from_id: usize, seq: &Arc<BaseSequence>, temp: f32) -> f32 {
         let mut safe_id = from_id % self.channels.len();
@@ -44,6 +50,7 @@ impl DGClient {
         }
     }
 
+    /// Returns the dg energy for a given `seq`. Will loop over all ports (channels) to send the query. Will start at port `start_port`.
     #[inline(always)]
     pub fn dg_arc(&self, seq: &Arc<BaseSequence>, temp: f32) -> f32 {
         self.dg_arc_from_id(0_usize, seq, temp)
@@ -55,6 +62,10 @@ pub struct ChannelHandler {
 }
 
 impl ChannelHandler {
+    /// Creates a single channel (port) through which queries can be sent.
+    /// # Arguments
+    /// * The arguments `a`, `b`, `c`, and `d` represent the IP address. For example, if the IP is 127.0.0.1, then `a` = 127, `b` = 0, `c` = 0, and `d` = 1.
+    /// * `port` - The port of this channel.
     pub fn new(a: u8, b: u8, c: u8, d: u8, port: u16) -> Option<ChannelHandler> {
         let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(a, b, c, d)), port);
         match TcpStream::connect_timeout(&socket, Duration::from_secs(3)) {
